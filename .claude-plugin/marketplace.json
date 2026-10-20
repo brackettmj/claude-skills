@@ -1,6 +1,8 @@
 {
   "name": "brackettmj-skills",
-  "owner": { "name": "Mitchell Brackett" },
+  "owner": {
+    "name": "Mitchell Brackett"
+  },
   "metadata": {
     "description": "Claude Code skills from incident management and day-to-day ops work."
   },
@@ -9,6 +11,11 @@
       "name": "postmortem",
       "source": "./plugins/postmortem",
       "description": "Blameless postmortems built from evidence: a named clock for every interval, why-ladders that end somewhere real, action items that count as done only when they're durable."
+    },
+    {
+      "name": "peerreview",
+      "source": "./plugins/peerreview",
+      "description": "Independent review of a finished document by a non-Anthropic model via OpenRouter, reconciled by Claude. Cost shown first; spend capped by a local budget jar."
     }
   ]
 }

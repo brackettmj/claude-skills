@@ -15,6 +15,7 @@ installs on its own.
 | Plugin | What it does |
 |---|---|
 | [postmortem](plugins/postmortem) | Blameless postmortems built from evidence. Every interval names its start and stop, every why-ladder ends at something you own or an honest "unknown," and action items count as done only when they're durable. [See an example.](plugins/postmortem/examples/checkout-503s.md) |
+| [peerreview](plugins/peerreview) | Sends a finished document to a model from another lab (GPT, Gemini, others via OpenRouter) for an independent fact-check, then has Claude sort the findings into confirmed, false positive and unverifiable. Shows the cost first; a local budget jar caps spend. |
 
 ## Contributing
 

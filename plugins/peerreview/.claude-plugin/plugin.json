@@ -1,0 +1,16 @@
+{
+  "name": "peerreview",
+  "version": "0.1.0",
+  "description": "Independent review of a finished document by a non-Anthropic model via OpenRouter, reconciled by Claude. Cost shown first; spend capped by a local budget jar.",
+  "author": {
+    "name": "Mitchell Brackett"
+  },
+  "license": "MIT",
+  "keywords": [
+    "review",
+    "fact-check",
+    "openrouter",
+    "verification",
+    "multi-model"
+  ]
+}
