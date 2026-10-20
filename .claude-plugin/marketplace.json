@@ -16,6 +16,11 @@
       "name": "peerreview",
       "source": "./plugins/peerreview",
       "description": "Independent review of a finished document by a non-Anthropic model via OpenRouter, reconciled by Claude. Cost shown first; spend capped by a local budget jar."
+    },
+    {
+      "name": "plain-writing",
+      "source": "./plugins/plain-writing",
+      "description": "Write or edit text so it reads like a person wrote it: no hype, no buzzwords, no hedging. Draft mode writes to the rules; review mode marks each AI tell and gives the plain fix."
     }
   ]
 }

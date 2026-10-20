@@ -16,6 +16,7 @@ installs on its own.
 |---|---|
 | [postmortem](plugins/postmortem) | Blameless postmortems built from evidence. Every interval names its start and stop, every why-ladder ends at something you own or an honest "unknown," and action items count as done only when they're durable. [See an example.](plugins/postmortem/examples/checkout-503s.md) |
 | [peerreview](plugins/peerreview) | Sends a finished document to a model from another lab (GPT, Gemini, others via OpenRouter) for an independent fact-check, then has Claude sort the findings into confirmed, false positive and unverifiable. Shows the cost first; a local budget jar caps spend. |
+| [plain-writing](plugins/plain-writing) | Writing that reads like a person wrote it. Draft mode writes to a plain-language rulebook; review mode marks each AI tell (filler, buzzwords, hedging, wrap-ups) with the fix. [See a before and after.](plugins/plain-writing/examples/before-after.md) |
 
 ## Contributing
 

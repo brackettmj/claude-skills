@@ -1,0 +1,16 @@
+{
+  "name": "plain-writing",
+  "version": "0.1.0",
+  "description": "Write or edit text so it reads like a person wrote it: no hype, no buzzwords, no hedging. Draft mode writes to the rules; review mode marks each AI tell and gives the plain fix.",
+  "author": {
+    "name": "Mitchell Brackett"
+  },
+  "license": "MIT",
+  "keywords": [
+    "writing",
+    "editing",
+    "style",
+    "plain-language",
+    "comms"
+  ]
+}
