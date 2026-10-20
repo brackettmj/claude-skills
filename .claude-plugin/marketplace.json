@@ -4,7 +4,7 @@
     "name": "Mitchell Brackett"
   },
   "metadata": {
-    "description": "Claude Code skills from incident management and day-to-day ops work."
+    "description": "Claude Code skills and plugins from incident management and day-to-day ops work."
   },
   "plugins": [
     {
@@ -21,6 +21,11 @@
       "name": "plain-writing",
       "source": "./plugins/plain-writing",
       "description": "Write or edit text so it reads like a person wrote it: no hype, no buzzwords, no hedging. Draft mode writes to the rules; review mode marks each AI tell and gives the plain fix."
+    },
+    {
+      "name": "bash-gate",
+      "source": "./plugins/bash-gate",
+      "description": "A hook, not a skill: limits Bash to a read-only policy in unattended claude -p runs, and a verify script proves the gate is live before you trust it. Off unless BASH_GATE is set."
     }
   ]
 }

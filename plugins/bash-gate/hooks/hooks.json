@@ -1,0 +1,16 @@
+{
+  "description": "Limit Bash to a read-only policy when BASH_GATE is set. Does nothing otherwise.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/bash-gate.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

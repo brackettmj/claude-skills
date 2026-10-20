@@ -1,0 +1,20 @@
+{
+  "description": "Conservative default: look at files and git history, syntax-check shell scripts. Nothing writes, nothing reaches the network.",
+  "commands": {
+    "ls": {"args": "any"},
+    "pwd": {"args": "any"},
+    "wc": {"args": "any"},
+    "stat": {"args": "any"},
+    "du": {"args": "any"},
+    "readlink": {"args": "any"},
+    "realpath": {"args": "any"},
+    "uname": {"args": "any"},
+    "date": {"args": "any"},
+    "bash": {"mode": "syntax-check"},
+    "git": {
+      "subcommands": ["log", "status", "diff", "show", "rev-parse", "describe", "blame"],
+      "flags_with_value": ["-C", "--git-dir", "--work-tree", "--namespace"],
+      "flags_before_subcommand": ["-P", "--no-pager", "--bare", "--no-replace-objects", "--no-optional-locks", "--literal-pathspecs"]
+    }
+  }
+}

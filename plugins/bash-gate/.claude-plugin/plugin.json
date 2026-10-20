@@ -1,0 +1,16 @@
+{
+  "name": "bash-gate",
+  "version": "0.1.0",
+  "description": "A PreToolUse hook that limits Bash to read-only commands in unattended claude -p runs, plus a verify script that proves the gate is live before you trust it. Off unless BASH_GATE is set.",
+  "author": {
+    "name": "Mitchell Brackett"
+  },
+  "license": "MIT",
+  "keywords": [
+    "hook",
+    "security",
+    "headless",
+    "automation",
+    "bash"
+  ]
+}
