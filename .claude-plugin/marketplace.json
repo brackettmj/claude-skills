@@ -1,0 +1,14 @@
+{
+  "name": "brackettmj-skills",
+  "owner": { "name": "Mitchell Brackett" },
+  "metadata": {
+    "description": "Claude Code skills from incident management and day-to-day ops work."
+  },
+  "plugins": [
+    {
+      "name": "postmortem",
+      "source": "./plugins/postmortem",
+      "description": "Blameless postmortems built from evidence: a named clock for every interval, why-ladders that end somewhere real, action items that count as done only when they're durable."
+    }
+  ]
+}
