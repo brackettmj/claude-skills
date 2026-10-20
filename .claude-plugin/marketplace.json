@@ -26,6 +26,11 @@
       "name": "bash-gate",
       "source": "./plugins/bash-gate",
       "description": "A hook, not a skill: limits Bash to a read-only policy in unattended claude -p runs, and a verify script proves the gate is live before you trust it. Off unless BASH_GATE is set."
+    },
+    {
+      "name": "memory-audit",
+      "source": "./plugins/memory-audit",
+      "description": "Audit a Claude Code memory folder for orphans, dead index lines, broken links, bad frontmatter, missing paths and memories that just copy a file. Reports only; deleting stays your call."
     }
   ]
 }

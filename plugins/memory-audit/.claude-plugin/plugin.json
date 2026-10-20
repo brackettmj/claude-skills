@@ -1,0 +1,15 @@
+{
+  "name": "memory-audit",
+  "version": "0.1.0",
+  "description": "Audit a Claude Code memory folder: memories missing from the index but still recallable, dead index lines, broken [[links]], bad frontmatter, paths that no longer exist, and memories that may just copy a file. Reports only; deleting stays your call.",
+  "author": {
+    "name": "Mitchell Brackett"
+  },
+  "license": "MIT",
+  "keywords": [
+    "memory",
+    "audit",
+    "maintenance",
+    "claude-code"
+  ]
+}
