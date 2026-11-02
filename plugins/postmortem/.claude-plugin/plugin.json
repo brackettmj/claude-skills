@@ -1,7 +1,7 @@
 {
   "name": "postmortem",
-  "version": "0.1.0",
-  "description": "Blameless postmortems built from evidence: a named clock for every interval, why-ladders that end somewhere real, action items that count as done only when they're durable.",
+  "version": "0.2.0",
+  "description": "Blameless postmortems built from evidence: a named clock for every interval, Five Whys chains that end at a real root cause, action items that count as done only when they're durable.",
   "author": { "name": "Mitchell Brackett" },
   "license": "MIT",
   "keywords": ["incident", "postmortem", "rca", "sre", "reliability"]

@@ -1,6 +1,6 @@
 ---
 name: postmortem
-description: Write a blameless incident postmortem (RCA, COE, incident review) from evidence. Use when the user asks for a postmortem, root cause analysis, incident write-up or retro on an outage, failed deploy, failed launch or anything that broke, or wants an existing postmortem reviewed. Interviews for the facts, builds the clock and the why-ladders, and ends with owned action items and a short exec summary.
+description: Write a blameless incident postmortem (RCA, COE, incident review) from evidence. Use when the user asks for a postmortem, root cause analysis, incident write-up or retro on an outage, failed deploy, failed launch or anything that broke, or wants an existing postmortem reviewed. Interviews for the facts, builds the clock and the Five Whys chains, and ends with owned action items and a short exec summary.
 ---
 
 # Postmortem
@@ -29,11 +29,18 @@ attempted, failed, rate. Watch for the case where a small per-request failure ra
 a total failure per job. Say whether there was a working service to lose. A failed
 launch and an outage are different stories.
 
-**4. Ask the whys, one ladder per symptom.** Each ladder ends at one of two bottoms:
-- a decision or gap the team owns and can change, or
+**4. Run the Five Whys, one chain per symptom.** Each chain ends at one of two places:
+- a root cause: a decision or gap the team owns and can change, or
 - "Unknown, stopped because ___."
 
-"It didn't work," "human error" and "the vendor was down" are never bottoms. Ask the
+Every why asks about the answer directly above it. If two answers both explain the same
+step, that's a branch, and the second one gets its own chain. If the failure needed two
+things to go wrong at once (it didn't fit *and* the safety mechanism failed), each is a
+cause with its own chain, not a "contributing factor." Aim for five whys when the
+evidence goes that far; stop sooner when a chain truly reaches its root cause, and say
+so. Never pad a chain to reach five.
+
+"It didn't work," "human error" and "the vendor was down" are never root causes. Ask the
 next why: why could one person's mistake reach production, why did the vendor outage
 take us down with it? Always run the four standing chains from the template (how it
 shipped, why testing missed it, why diagnosis took as long as it did, why it spread),
@@ -43,7 +50,7 @@ even when the mechanism is obvious.
 couldn't get. List them in counter-evidence. A clean story with no loose ends usually
 means nobody looked for any.
 
-**6. Write action items that close.** Each one links to a ladder, has a type
+**6. Write action items that close.** Each one links to a chain, has a type
 (fix / detect / mitigate / prevent / verify / record), an owner who is a person, and a
 tracking link or a placeholder flagged for the user to fill. Done means durable: in
 the code, the config, the runbook or the tracker. "We'll remember" and "be more careful"
@@ -58,7 +65,7 @@ version for leadership: impact, cause, fix, the one action item that matters mos
 - **Blameless.** Name roles and systems, not people, when describing what went wrong.
   People appear in section 3 (who was involved) and as action-item owners. Nowhere else.
 - **Mark guesses.** A time or number you inferred gets a `~`. A cause you suspect but
-  can't prove goes in counter-evidence, not the root-cause ladder.
+  can't prove goes in counter-evidence, not the Five Whys chain.
 - **Ask before inventing.** If a field needs a fact you don't have, ask for it. If the
   user doesn't know, write "unknown" with the reason, then move on.
 - **Plain words.** The title says what failed ("Checkout returned 503s for 41 minutes
@@ -68,6 +75,6 @@ version for leadership: impact, cause, fix, the one action item that matters mos
 
 When asked to review one instead of writing it, check it against the steps above and
 report what's missing or weak in order of severity: intervals without a named start
-and stop, ladders that stop at "human error," action items without an owner or that
+and stop, chains that stop at "human error," action items without an owner or that
 aren't durable, impact with no units, and a summary that hides the cause. Quote the
 line you're pointing at and say what would fix it.

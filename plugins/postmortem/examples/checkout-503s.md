@@ -72,24 +72,24 @@ service, and the pool has held under 40% through two daily peaks since.
 3. Every price lookup missed the cache and hit the DB. → Why?
 4. The cache TTL was set to 0, which the cache client treats as "don't cache." → Why
    was 0 allowed?
-5. **Bottom (owned):** the config schema accepts any integer for TTL. A value of 0
+5. **Root cause (owned):** the config schema accepts any integer for TTL. A value of 0
    was meant as "use the default," which is what it means in a different service's
    config.
 
 **Chain B — how did it get shipped?**
 1. The change rode in a batch of six config edits with one reviewer. → Why?
-2. **Bottom (owned):** config changes don't need the owning team's review. The
+2. **Root cause (owned):** config changes don't need the owning team's review. The
    catalog team never saw this one.
 
 **Chain C — why didn't testing catch it?**
 1. Staging passed. → Why?
 2. Staging traffic is about 1% of production, and the DB pool never saturated.
-3. **Bottom (owned):** no pre-deploy check compares cache hit rate before and after.
+3. **Root cause (owned):** no pre-deploy check compares cache hit rate before and after.
 
 **Chain D — why did diagnosis take 28 minutes?**
 1. The IC rolled back the code deploy first. → Why?
 2. The deploy dashboard shows code deploys but not config deploys.
-3. **Bottom (owned):** config changes have no "recent changes" view next to code.
+3. **Root cause (owned):** config changes have no "recent changes" view next to code.
 
 **Chain E — why did it spread to search?**
 1. Search shares the catalog DB pool. **Unknown whether a separate pool would have

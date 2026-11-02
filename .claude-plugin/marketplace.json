@@ -10,7 +10,7 @@
     {
       "name": "postmortem",
       "source": "./plugins/postmortem",
-      "description": "Blameless postmortems built from evidence: a named clock for every interval, why-ladders that end somewhere real, action items that count as done only when they're durable."
+      "description": "Blameless postmortems built from evidence: a named clock for every interval, Five Whys chains that end at a real root cause, action items that count as done only when they're durable."
     },
     {
       "name": "peerreview",

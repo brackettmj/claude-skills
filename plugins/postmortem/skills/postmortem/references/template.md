@@ -47,15 +47,19 @@ record before writing. A session not in the record is half the story missing.
 
 Times, events, and the evidence that drove each decision. Mark guesses with `~`.
 
-## 5. Root cause: the whys
+## 5. Root cause: Five Whys
 
-One numbered ladder per symptom (Chain A, B, …). Each why ends at one of two bottoms:
+One chain per symptom (Chain A, B, …). Each chain ends at one of two places:
 
-- **A decision or gap we own and can change**, or
+- **Root cause:** a decision or gap we own and can change, or
 - **"Unknown — stopped because ___."** Stopping is fine. Not saying why you stopped
   is not.
 
-"It didn't work" is never a bottom. Ask the next why.
+Each why asks about the answer directly above it. A second answer to the same why is a
+branch: give it its own chain. Aim for five whys where the evidence supports it; stop
+sooner when the chain truly reaches its root cause. Never pad to five.
+
+"It didn't work" is never a root cause. Ask the next why.
 
 Always run these chains, even when the mechanism is obvious:
 - **How did it get shipped?** (capacity, review, design)
