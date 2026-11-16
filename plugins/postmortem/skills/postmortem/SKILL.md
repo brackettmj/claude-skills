@@ -70,11 +70,29 @@ version for leadership: impact, cause, fix, the one action item that matters mos
   user doesn't know, write "unknown" with the reason, then move on.
 - **Plain words.** The title says what failed ("Checkout returned 503s for 41 minutes
   after a cache config change"), not "Service Degradation Event."
+- **Specific wherever the evidence allows.** Write for an engineer who wants to retrace
+  the reasoning. Give the exact command, the error string, the exit code, the version,
+  the file and function, the test count and what each check proved. Take timestamps
+  from logs, version control and file metadata rather than recollection. "Restarted the
+  service" is weaker than "`systemctl restart api` at 14:02, healthy at 14:03 per the
+  load balancer's target check." Vague is only acceptable where the record is.
+- **Specific, but safe to share.** Postmortems get forwarded and published, so leave out
+  anything that maps the attack surface: account and resource IDs, IP addresses and
+  internal hostnames, ARNs and principal names, key material, fingerprints and secret
+  labels, exploitable version-plus-misconfiguration pairs that are still unpatched.
+  Describe those by role ("a dedicated IAM user scoped to one action", "the database
+  host"). The detail that makes a postmortem useful is the mechanism, and the mechanism
+  almost never needs the identifier.
+- **Own the response's mistakes too.** If the recovery itself went wrong (a wrong
+  instruction, a check that couldn't fail, a step that had to be redone), that's a chain
+  of its own. A postmortem that's only about the original failure hides half of what
+  the team can fix.
 
 ## Reviewing an existing postmortem
 
 When asked to review one instead of writing it, check it against the steps above and
 report what's missing or weak in order of severity: intervals without a named start
 and stop, chains that stop at "human error," action items without an owner or that
-aren't durable, impact with no units, and a summary that hides the cause. Quote the
-line you're pointing at and say what would fix it.
+aren't durable, impact with no units, a summary that hides the cause, steps described
+vaguely where the record had specifics, and any identifier or secret that shouldn't
+leave the team. Quote the line you're pointing at and say what would fix it.
