@@ -31,6 +31,11 @@
       "name": "memory-audit",
       "source": "./plugins/memory-audit",
       "description": "Audit a Claude Code memory folder for orphans, dead index lines, broken links, bad frontmatter, missing paths and memories that just copy a file. Reports only; deleting stays your call."
+    },
+    {
+      "name": "claude-setup-backup",
+      "source": "./plugins/claude-setup-backup",
+      "description": "Back up your Claude Code setup (CLAUDE.md and its imports, memories, commands, hooks) to a private git repo and rebuild a new machine from it in one command. Deletions carry over, public repos and keys are refused, and a checkup proves the rebuild worked."
     }
   ]
 }
