@@ -371,5 +371,121 @@ class DryRun(Base):
         self.assertEqual(tree(b), {})  # not even the backup clone or the state file
 
 
+class PushGuard(Base):
+    """The personal-terms list and the pre-push hook. The backup is private and
+    may hold anything; a public repo may not."""
+
+    def public_repo(self, h: Path) -> Path:
+        pub = self.tmp / "public.git"
+        subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(pub)], check=True)
+        work = h / "site"
+        subprocess.run(["git", "init", "-q", "-b", "main", str(work)], check=True)
+        subprocess.run(["git", "-C", str(work), "remote", "add", "origin", str(pub)], check=True)
+        return work
+
+    def commit(self, work: Path, name: str, text: str, msg="update"):
+        (work / name).write_text(text)
+        subprocess.run(["git", "-C", str(work), "add", "-A"], check=True)
+        subprocess.run(["git", "-C", str(work), "-c", "user.name=t", "-c", "user.email=t@t",
+                        "commit", "-q", "-m", msg], check=True)
+
+    def push(self, work: Path):
+        return subprocess.run(["git", "-C", str(work), "push", "-q", "origin", "main"],
+                              capture_output=True, text=True)
+
+    def guarded(self):
+        h = self.use(self.machine("alice"))
+        quiet(csb.terms_add, h, ["Quillfeather", "Northwind Labs"], literal=True)
+        quiet(csb.terms_add, h, ["Alice Quillfeather (MIT)"], allow=True)
+        work = self.public_repo(h)
+        rc, out = quiet(csb.guard_install, h, work)
+        self.assertEqual(rc, 0, out)
+        return h, work
+
+    def test_starter_file_is_comments_only(self):
+        h = self.use(self.machine("alice"))
+        self.assertTrue(csb.ensure_terms_file(h))
+        self.assertFalse(csb.ensure_terms_file(h))  # never overwritten
+        self.assertIsNone(csb.term_matcher(h))       # nothing active until the user adds terms
+        with self.assertRaises(csb.CsbError):
+            quiet(csb.guard_install, h, self.public_repo(h))
+
+    def test_clean_push_goes_through(self):
+        h, work = self.guarded()
+        self.commit(work, "index.html", "<p>Welcome</p>\n")
+        r = self.push(work)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_term_in_a_file_blocks_the_push(self):
+        h, work = self.guarded()
+        self.commit(work, "about.md", "Built at northwind labs.\n")
+        r = self.push(work)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("about.md:1", r.stderr)
+        self.assertEqual(commits(self.tmp / "public.git"), 0)
+
+    def test_term_in_a_commit_message_blocks_the_push(self):
+        h, work = self.guarded()
+        self.commit(work, "index.html", "<p>Welcome</p>\n", msg="fix for quillfeather")
+        r = self.push(work)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("message", r.stderr)
+
+    def test_exception_lets_the_credit_through(self):
+        h, work = self.guarded()
+        self.commit(work, "LICENSE", "Copyright Alice Quillfeather (MIT)\n")
+        r = self.push(work)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_missing_list_blocks_instead_of_passing(self):
+        h, work = self.guarded()
+        csb.terms_path(h).unlink()
+        self.commit(work, "index.html", "<p>Welcome</p>\n")
+        r = self.push(work)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("can't be checked", r.stderr)
+
+    def test_someone_elses_hook_is_not_overwritten(self):
+        h = self.use(self.machine("alice"))
+        quiet(csb.terms_add, h, ["Quillfeather"], literal=True)
+        work = self.public_repo(h)
+        hook = work / ".git" / "hooks" / "pre-push"
+        hook.write_text("#!/bin/sh\nexit 0\n")
+        with self.assertRaises(csb.CsbError):
+            quiet(csb.guard_install, h, work)
+        self.assertEqual(hook.read_text(), "#!/bin/sh\nexit 0\n")
+
+    def test_check_command_for_files_outside_git(self):
+        h = self.use(self.machine("alice"))
+        quiet(csb.terms_add, h, ["Quillfeather"], literal=True)
+        post = self.tmp / "post.md"
+        post.write_text("Thanks to everyone.\n")
+        self.assertEqual(quiet(csb.terms_check, h, [str(post)])[0], 0)
+        post.write_text("Thanks to the Quillfeather team.\n")
+        rc, out = quiet(csb.terms_check, h, [str(post)])
+        self.assertEqual(rc, 1)
+        self.assertIn("post.md:1", out)
+
+    def test_list_travels_in_the_private_backup(self):
+        h, work = self.guarded()
+        self.setup_backup(h)  # personal terms are fine in the private backup
+        b = self.use(self.tmp / "bob")
+        b.mkdir()
+        quiet(csb.restore, b, str(self.bare), b / "backup")
+        self.assertIn("Quillfeather", csb.terms_path(b).read_text())
+        rc, out = quiet(csb.doctor, b)   # bob hasn't cloned site or put the guard back
+        self.assertGreaterEqual(rc, 1)
+        self.assertIn("push guard missing", out)
+
+    def test_doctor_flags_a_removed_hook(self):
+        h, work = self.guarded()
+        self.setup_backup(h)
+        self.assertEqual(quiet(csb.doctor, h)[0], 0)
+        (work / ".git" / "hooks" / "pre-push").unlink()
+        rc, out = quiet(csb.doctor, h)
+        self.assertGreaterEqual(rc, 1)
+        self.assertIn("push guard missing", out)
+
+
 if __name__ == "__main__":
     unittest.main()

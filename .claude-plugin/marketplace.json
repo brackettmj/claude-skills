@@ -35,7 +35,7 @@
     {
       "name": "claude-setup-backup",
       "source": "./plugins/claude-setup-backup",
-      "description": "Back up your Claude Code setup (CLAUDE.md and its imports, memories, commands, hooks) to a private git repo and rebuild a new machine from it in one command. Deletions carry over, public repos and keys are refused, and a checkup proves the rebuild worked."
+      "description": "Back up your Claude Code setup (CLAUDE.md and its imports, memories, commands, hooks) to a private git repo and rebuild a new machine from it in one command. Also keeps a personal-terms list and a git push guard so your name, employer and other personal detail stay out of anything you publish."
     }
   ]
 }

@@ -37,6 +37,8 @@ servers), or session transcripts.
 | `/claude-setup-backup:setup` | Scans this machine and shows what it found. You untick anything to leave out, pick a private repo, and say whether to sync automatically. Your files stay where they are; the repo holds copies. |
 | `/claude-setup-backup:sync` | Syncs both ways. `--dry-run` shows what would change and writes nothing. |
 | `/claude-setup-backup:restore owner/repo` | Rebuilds a machine from the backup. Previews first. Never overwrites a file that's already there. |
+| `/claude-setup-backup:personal-terms` | Builds your list of terms that must never be published. Claude suggests them from your CLAUDE.md and memory; you approve each one. `check FILE` scans a post or doc. |
+| `/claude-setup-backup:push-guard install` | Adds a pre-push hook to a repo that blocks any push containing one of your terms. |
 | `/claude-setup-backup:doctor` | Checks the setup is whole: CLAUDE.md imports resolve, memory index links point at real files, backed-up hooks are wired, listed repos are cloned, the backup is private and current. |
 
 If you turn on auto-sync during setup, it syncs at the start and end of every
@@ -75,6 +77,27 @@ exist, Claude Code skips it with no warning, and everything in it is missing
 from your sessions. `doctor` makes that a `FAIL`. This plugin exists because a
 one-letter typo in an import did exactly that.
 
+## Keeping personal detail out of what you publish
+
+The backup is private and is supposed to hold personal detail. Public repos
+aren't. So the plugin also keeps a **personal-terms list**: your name, your
+employer, people you mention, your assistant's persona name, hostnames, your
+home network range. It also has a **push guard**, a git pre-push hook that
+blocks a push carrying any of them.
+
+- The list starts empty. The first session after install creates
+  `~/.claude/personal-terms.txt` with comments only. Nothing ships with the plugin.
+- `/claude-setup-backup:personal-terms` has Claude read your CLAUDE.md and
+  memory and **suggest** terms. You approve each one; nothing is added without a yes.
+- `/claude-setup-backup:push-guard install` puts the hook on a repo. It checks
+  every file in the pushed commit and every new commit message. If the list is
+  missing, it blocks rather than letting the push through unchecked.
+- Exceptions (a public author credit) are lines starting with `!`.
+- `personal-terms check FILE` checks anything you publish outside git: a
+  post, a doc, an email draft.
+- The list travels in your private backup, and `REBUILD.md` lists the repos
+  to put the guard back on.
+
 ## The rebuild checklist
 
 Every sync writes `REBUILD.md` into the backup repo. It's built from your
@@ -108,7 +131,9 @@ python3 -m unittest discover plugins/claude-setup-backup/tests
 Each guard is tested from both sides, the clean case passing and a planted
 defect caught: a public repo, a repo made public later, a key in a memory file
 and one in `settings.json`, a broken import, a dead memory link, a missing
-hook, a deletion that must stay deleted, and a dry run that must write
-nothing. Every guard was also broken on purpose to confirm a test goes red.
+hook, a deletion that must stay deleted, a dry run that must write
+nothing, and pushes with a term in a file, in a commit message, with an
+exception, and with the list missing. Every guard was also broken on purpose
+to confirm a test goes red.
 
 MIT licensed.

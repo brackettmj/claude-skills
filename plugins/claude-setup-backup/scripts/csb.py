@@ -14,6 +14,8 @@ session transcripts.
     csb.py restore --remote OWNER/NAME [--dry-run]
     csb.py doctor [--quiet]                  exit code = number of FAILs
     csb.py hook start|end                    for the plugin's session hooks
+    csb.py terms add|list|check ...          personal terms that must never be published
+    csb.py guard install|remove|status [REPO]  pre-push hook that blocks them
 
 Standard library only. Runs on Linux, macOS and Windows.
 """
@@ -466,6 +468,8 @@ def file_map(man: dict, repo: Path, h: Path) -> dict:
                 pairs[f"home/{rel}/{sub}"] = live / sub
         else:
             pairs[f"home/{rel}"] = live
+    for name in (TERMS_FILE, GUARD_LIST):
+        pairs[f"claude/{name}"] = ch / name
     # imports that only exist in the backup still restore (new machine)
     if man.get("claude_md") and (repo / "home").is_dir():
         for rel in files_under(repo / "home"):
@@ -558,6 +562,11 @@ def write_checklist(man: dict, repo: Path, spec: str) -> None:
         lines += ["5. Install what your hooks and status line call:", ""]
         lines += [f"   - `{t}`" for t in tools]
         lines.append("")
+    gl = read_json(repo / "claude" / GUARD_LIST, {}) or {}
+    if gl.get("repos"):
+        lines += ["5b. Put the push guard back on the repos you publish from (after cloning them):", ""]
+        lines += [f"       /claude-setup-backup:push-guard install ~/{r}" for r in gl["repos"]]
+        lines.append("")
     lines += [
         "6. Run `/claude-setup-backup:doctor`. Every line should say `ok`.",
         "",
@@ -629,6 +638,8 @@ def sync(h: Path, dry_run=False, quiet=False, message=None, pull_remote=True) ->
             conflicts.append(live)
     if scrubbed is not None:
         write_json(repo / "claude" / "settings.json", scrubbed)
+    if guarded_repos(h):
+        refresh_guard_copy(h)
     write_checklist(man, repo, st["remote"])
 
     git(repo, "add", "-A")
@@ -657,6 +668,276 @@ def sync(h: Path, dry_run=False, quiet=False, message=None, pull_remote=True) ->
     if n["drop-live"]:
         say(f"  files deleted on another machine were moved to {trash_dir(h)}")
     return 0
+
+
+# --------------------------------------------------------------------------
+# personal terms and the push guard
+#
+# The backup is private and is supposed to hold personal detail. Public repos
+# aren't. The terms list names what must never be published (your name, your
+# employer, people you mention, hostnames, your home network), and the push
+# guard is a git pre-push hook that blocks a push carrying any of it.
+
+TERMS_FILE = "personal-terms.txt"
+GUARD_LIST = "claude-setup-backup.guard.json"
+GUARD_COPY = "claude-setup-backup-guard.py"
+HOOK_MARK = "# claude-setup-backup push guard"
+ZERO_SHA = "0" * 40
+MAX_BLOB = 2_000_000
+
+
+def terms_path(h: Path) -> Path:
+    return claude_home(h) / TERMS_FILE
+
+
+def load_terms(h: Path):
+    """(patterns, allow). Lines are case-insensitive regexes; a line starting
+    with '!' is a literal exception removed from text before matching (an
+    author credit, say). Returns None when there is no list."""
+    p = terms_path(h)
+    if not p.is_file():
+        return None
+    pats, allow = [], []
+    for n, raw in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("!"):
+            allow.append(line[1:].strip())
+            continue
+        try:
+            re.compile(line)
+        except re.error as e:
+            raise CsbError(f"{p}:{n}: '{line}' isn't a valid pattern ({e}). "
+                           "Add plain words with --literal.")
+        pats.append(line)
+    return pats, allow
+
+
+def term_matcher(h: Path):
+    t = load_terms(h)
+    if t is None:
+        return None
+    pats, allow = t
+    if not pats:
+        return None
+    rx = re.compile("|".join(f"(?:{p})" for p in pats), re.IGNORECASE)
+    allow_rx = (re.compile("|".join(re.escape(a) for a in allow), re.IGNORECASE)
+                if allow else None)
+
+    def match(text: str):
+        if allow_rx:
+            text = allow_rx.sub("", text)
+        m = rx.search(text)
+        return m.group(0) if m else None
+    return match
+
+
+def text_term_hits(label: str, text: str, match):
+    out = []
+    for n, line in enumerate(text.splitlines(), 1):
+        hit = match(line)
+        if hit:
+            out.append(f"{label}:{n}: '{hit}'")
+    return out
+
+
+TERMS_TEMPLATE = """\
+# Personal terms: things that must never show up in anything you publish.
+#
+# The push guard blocks a git push to a guarded repo if any file or commit
+# message in it matches a line below. The list itself is only ever stored on
+# this machine and in your private backup.
+#
+# Not sure what to put here? Ask Claude:
+#   "Suggest personal terms for my push guard from my CLAUDE.md and memory."
+# It will propose them and add only the ones you approve.
+#
+# Typical entries: your full name, your employer, people you mention by name,
+# your assistant's persona name, machine hostnames, your home network range.
+#
+# One case-insensitive regex per line. Lines starting with # are comments.
+# A line starting with ! is an exception: that exact text is ignored, e.g. a
+# public author credit. Examples (remove the # to use):
+#
+#   your-name
+#   your-employer
+#   192\\.168\\.1\\.
+#   !Your Name (MIT license credit)
+"""
+
+
+def ensure_terms_file(h: Path) -> bool:
+    """Create the starter list (comments only) if there isn't one. True if it
+    was created."""
+    p = terms_path(h)
+    if p.exists():
+        return False
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(TERMS_TEMPLATE, encoding="utf-8")
+    try:
+        p.chmod(0o600)
+    except OSError:
+        pass
+    return True
+
+
+def terms_add(h: Path, items, literal=False, allow=False) -> int:
+    ensure_terms_file(h)
+    p = terms_path(h)
+    existing = p.read_text(encoding="utf-8").splitlines()
+    have = {l.strip() for l in existing}
+    added = []
+    for it in items:
+        line = ("!" + it) if allow else (re.escape(it) if literal else it)
+        if not allow:
+            try:
+                re.compile(line)
+            except re.error as e:
+                raise CsbError(f"'{it}' isn't a valid pattern ({e}). Use --literal for plain text.")
+        if line not in have:
+            existing.append(line)
+            have.add(line)
+            added.append(line)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text("\n".join(existing) + "\n", encoding="utf-8")
+    try:
+        p.chmod(0o600)
+    except OSError:
+        pass
+    print(f"{len(added)} added to {p}" + (": " + ", ".join(added) if added else " (all already there)"))
+    return 0
+
+
+def terms_check(h: Path, paths) -> int:
+    """Check files or folders on disk, for things published outside git (a
+    post, a doc, an email draft). Exit 1 on any hit."""
+    match = term_matcher(h)
+    if match is None:
+        raise CsbError(f"no personal terms yet ({terms_path(h)}). Add some with: terms add")
+    hits = []
+    for raw in paths:
+        p = Path(raw)
+        targets = [p / f for f in files_under(p)] if p.is_dir() else [p]
+        for f in targets:
+            try:
+                data = f.read_bytes()
+            except OSError as e:
+                raise CsbError(f"can't read {f}: {e}")
+            if b"\0" in data[:8000]:
+                continue
+            hits += text_term_hits(str(f), data.decode("utf-8", "replace"), match)
+    for line in hits:
+        print(line)
+    print(f"---- {len(hits)} personal term(s) found" if hits else "clean: no personal terms found")
+    return 1 if hits else 0
+
+
+def guard_list_path(h: Path) -> Path:
+    return claude_home(h) / GUARD_LIST
+
+
+def guarded_repos(h: Path):
+    return (read_json(guard_list_path(h), {}) or {}).get("repos", [])
+
+
+def refresh_guard_copy(h: Path) -> Path:
+    """The hook calls a copy of this script in ~/.claude, not the plugin's own
+    path, which changes on every plugin update."""
+    dst = claude_home(h) / GUARD_COPY
+    src = Path(__file__).resolve()
+    if not (dst.exists() and dst.resolve() == src):   # skip when running as the copy
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+    return dst
+
+
+def hook_file(repo: Path) -> Path:
+    if not (repo / ".git").exists():
+        raise CsbError(f"{repo} isn't a git repo")
+    if git_out(repo, "config", "core.hooksPath"):
+        raise CsbError(f"{repo} uses core.hooksPath (a hook manager like husky). Call "
+                       f"`python3 {claude_home(home()) / GUARD_COPY} guard pre-push` from its "
+                       "pre-push hook instead.")
+    return Path(git_out(repo, "rev-parse", "--absolute-git-dir")) / "hooks" / "pre-push"
+
+
+def guard_install(h: Path, repo: Path) -> int:
+    repo = repo.resolve()
+    if term_matcher(h) is None:
+        raise CsbError("add personal terms first (terms add); a guard with nothing to look for "
+                       "would pass everything.")
+    hf = hook_file(repo)
+    if hf.exists() and HOOK_MARK not in hf.read_text(encoding="utf-8", errors="replace"):
+        raise CsbError(f"{hf} already has a pre-push hook that isn't ours. Add this line to it "
+                       f"instead:\n  python3 \"{claude_home(h) / GUARD_COPY}\" guard pre-push \"$@\" || exit 1")
+    guard = refresh_guard_copy(h)
+    hf.parent.mkdir(parents=True, exist_ok=True)
+    hf.write_text(f'#!/bin/sh\n{HOOK_MARK}\n# Blocks a push that carries a personal term. Remove with:\n'
+                  f'#   csb.py guard remove {repo}\n'
+                  f'exec python3 "{guard}" guard pre-push "$@"\n', encoding="utf-8")
+    hf.chmod(0o755)
+    rel = Path(os.path.relpath(repo, h)).as_posix() if under(repo, h) else str(repo)
+    gl = read_json(guard_list_path(h), {}) or {}
+    repos = gl.get("repos", [])
+    if rel not in repos:
+        repos.append(rel)
+    write_json(guard_list_path(h), {"repos": sorted(repos)})
+    print(f"push guard installed in {repo}")
+    return 0
+
+
+def guard_remove(h: Path, repo: Path) -> int:
+    repo = repo.resolve()
+    hf = hook_file(repo)
+    if hf.exists() and HOOK_MARK in hf.read_text(encoding="utf-8", errors="replace"):
+        hf.unlink()
+    rel = Path(os.path.relpath(repo, h)).as_posix() if under(repo, h) else str(repo)
+    gl = read_json(guard_list_path(h), {}) or {}
+    write_json(guard_list_path(h), {"repos": [r for r in gl.get("repos", []) if r != rel]})
+    print(f"push guard removed from {repo}")
+    return 0
+
+
+def guard_pre_push(h: Path, stdin_text: str, repo: Path = Path(".")) -> int:
+    """The hook itself. Checks every file in each pushed commit's tree, and the
+    message of each commit being pushed. Fails closed: no list, no push."""
+    match = term_matcher(h)
+    if match is None:
+        print(f"push guard: no personal terms at {terms_path(h)}, so this push can't be "
+              "checked. Blocking. Restore the list, or `git push --no-verify` to skip once.",
+              file=sys.stderr)
+        return 1
+    hits = []
+    for line in stdin_text.splitlines():
+        parts = line.split()
+        if len(parts) != 4 or parts[1] == ZERO_SHA:
+            continue
+        local_sha, remote_sha = parts[1], parts[3]
+        files = git_out(repo, "ls-tree", "-r", "-z", "--name-only", local_sha).split("\0")
+        for f in filter(None, files):
+            r = subprocess.run(["git", "-C", str(repo), "cat-file", "blob", f"{local_sha}:{f}"],
+                               capture_output=True)
+            data = r.stdout
+            if r.returncode or len(data) > MAX_BLOB or b"\0" in data[:8000]:
+                continue
+            hits += text_term_hits(f, data.decode("utf-8", "replace"), match)
+        rng = [local_sha, "-n", "50"] if remote_sha == ZERO_SHA else [f"{remote_sha}..{local_sha}"]
+        log = git_out(repo, "log", "--format=%h%x00%B%x01", *rng)
+        for entry in filter(None, (e.strip("\n") for e in log.split("\x01"))):
+            short, _, msg = entry.partition("\0")
+            hits += text_term_hits(f"commit {short} message", msg, match)
+        # a file can appear in several pushed refs; report each hit once
+    hits = list(dict.fromkeys(hits))
+    if not hits:
+        return 0
+    print("push guard: blocked. These look like personal terms:", file=sys.stderr)
+    for x in hits:
+        print("  " + x, file=sys.stderr)
+    print("Fix by amending the commit that added it: a fix-up commit on top still publishes "
+          "the old one. If it's a false alarm, add an exception (terms add --allow TEXT) or "
+          "push once with --no-verify.", file=sys.stderr)
+    return 1
 
 
 # --------------------------------------------------------------------------
@@ -790,6 +1071,27 @@ def doctor(h: Path, quiet=False) -> int:
                 ok(f"memory '{key}': every index link resolves")
 
     try:
+        t = load_terms(h)
+        if t is None:
+            warn(f"no personal-terms list ({terms_path(h)}): pushes to public repos aren't checked")
+        else:
+            ok(f"personal-terms list: {len(t[0])} term(s), {len(t[1])} exception(s)")
+    except CsbError as e:
+        fail(str(e))
+    for rel in guarded_repos(h):
+        repo_p = Path(rel) if Path(rel).is_absolute() else h / rel
+        try:
+            hf = hook_file(repo_p)
+            good = hf.is_file() and HOOK_MARK in hf.read_text(encoding="utf-8", errors="replace") \
+                and os.access(hf, os.X_OK) and (claude_home(h) / GUARD_COPY).is_file()
+        except CsbError:
+            good = False
+        if good:
+            ok(f"push guard on ~/{rel}" if not Path(rel).is_absolute() else f"push guard on {rel}")
+        else:
+            fail(f"push guard missing on {rel}: run guard install {repo_p}")
+
+    try:
         st = load_state(h)
     except CsbError as e:
         fail(str(e))
@@ -884,6 +1186,24 @@ def main(argv=None) -> int:
     p.add_argument("--quiet", action="store_true")
     p = sub.add_parser("hook")
     p.add_argument("event", choices=["start", "end"])
+    p = sub.add_parser("terms", help="the list of personal terms that must never be published")
+    tsub = p.add_subparsers(dest="terms_cmd", required=True)
+    q = tsub.add_parser("add")
+    q.add_argument("items", nargs="+")
+    q.add_argument("--literal", action="store_true", help="treat each item as plain text, not a regex")
+    q.add_argument("--allow", action="store_true", help="add as an exception (literal text)")
+    tsub.add_parser("list")
+    q = tsub.add_parser("check", help="check files or folders, for things published outside git")
+    q.add_argument("paths", nargs="+")
+    p = sub.add_parser("guard", help="the git pre-push hook that blocks personal terms")
+    gsub = p.add_subparsers(dest="guard_cmd", required=True)
+    q = gsub.add_parser("install")
+    q.add_argument("repo", nargs="?", default=".")
+    q = gsub.add_parser("remove")
+    q.add_argument("repo", nargs="?", default=".")
+    gsub.add_parser("status")
+    q = gsub.add_parser("pre-push")
+    q.add_argument("hook_args", nargs="*")
     a = ap.parse_args(argv)
     h = home()
     try:
@@ -904,7 +1224,28 @@ def main(argv=None) -> int:
                            a.dry_run, a.allow_unverified)
         if a.cmd == "doctor":
             return min(doctor(h, a.quiet), 125)
+        if a.cmd == "terms":
+            if a.terms_cmd == "add":
+                return terms_add(h, a.items, a.literal, a.allow)
+            if a.terms_cmd == "list":
+                p = terms_path(h)
+                print(p.read_text(encoding="utf-8") if p.is_file() else f"no list yet at {p}")
+                return 0
+            return terms_check(h, a.paths)
+        if a.cmd == "guard":
+            if a.guard_cmd == "install":
+                return guard_install(h, Path(a.repo))
+            if a.guard_cmd == "remove":
+                return guard_remove(h, Path(a.repo))
+            if a.guard_cmd == "status":
+                repos = guarded_repos(h)
+                print("\n".join(repos) if repos else "no repos guarded")
+                return 0
+            return guard_pre_push(h, sys.stdin.read())
         if a.cmd == "hook":
+            if a.event == "start" and ensure_terms_file(h):
+                print(f"claude-setup-backup: created {terms_path(h)} for your personal terms "
+                      "(empty for now). Ask Claude to suggest some from your CLAUDE.md and memory.")
             st = read_json(state_path(h))
             if not st:
                 return 0

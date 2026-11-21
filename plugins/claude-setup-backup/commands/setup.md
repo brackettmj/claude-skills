@@ -45,5 +45,12 @@ stay where they are, and the backup repo holds copies.
    memory holds personal detail. Don't look for a way around that.
 
 5. Report what was backed up, the repo it went to, and that the repo now has a
-   `REBUILD.md` with the steps for a new machine. Suggest running
-   `/claude-setup-backup:doctor`.
+   `REBUILD.md` with the steps for a new machine.
+
+6. Offer the push guard: "Do you publish anything (public repos, a site)? I can
+   build a list of personal terms that must never be published, and block any
+   git push that contains one." If yes, follow
+   `/claude-setup-backup:personal-terms` (suggest mode), then
+   `/claude-setup-backup:push-guard install` on each repo they name.
+
+7. Suggest running `/claude-setup-backup:doctor`.
