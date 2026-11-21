@@ -1,0 +1,19 @@
+{
+  "name": "claude-setup-backup",
+  "version": "0.1.0",
+  "description": "Back up your Claude Code setup (CLAUDE.md and its imports, memories, slash commands, agents, skills and hooks) to a private git repo, and rebuild a new or wiped machine in one command with a checkup that proves it worked. Includes a personal-terms list and a git push guard that keeps your name, employer and other personal detail out of anything you publish.",
+  "author": {
+    "name": "Mitchell Brackett"
+  },
+  "license": "MIT",
+  "keywords": [
+    "backup",
+    "restore",
+    "memory",
+    "claude-md",
+    "sync",
+    "claude-code",
+    "privacy",
+    "pre-push"
+  ]
+}
